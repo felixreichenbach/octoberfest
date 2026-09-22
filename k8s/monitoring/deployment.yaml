@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sm-probe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sm-probe
+  template:
+    metadata:
+      labels:
+        app: sm-probe
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: sm-agent
+          image: "grafana/synthetic-monitoring-agent:latest"
+          args:
+            - --api-server-address=$(API_SERVER_ADDRESS)
+          env:
+            - name: API_SERVER_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: oktoberfest-sm-probe
+                  key: api-server-address
+            - name: SM_AGENT_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: oktoberfest-sm-probe
+                  key: api-token

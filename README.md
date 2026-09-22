@@ -34,9 +34,22 @@ minikube service frontend -n oktoberfest   # opens the shop in your browser
 
 Notes:
 
-- The `backend` pod will typically restart once or twice on first boot (`CrashLoopBackOff`) while `db` is still starting — there's no Compose-style `depends_on` in Kubernetes, so it relies on the normal restart backoff instead. It recovers on its own once Postgres is ready.
+- There's no Compose-style `depends_on` in Kubernetes, so the backend retries its database connection internally with backoff on startup instead of relying on restarts — it comes up clean even if `db` isn't ready yet.
 - `k8s/secret.yaml` ships the same demo credentials as `docker-compose.yml`, for the same reason — replace them before any real deployment.
 - To tear down: `kubectl delete -k k8s/` (and `minikube stop` if you're done with the cluster).
+
+### Synthetic Monitoring (optional, via `gcx`)
+
+There's an opt-in private [Grafana Synthetic Monitoring](https://grafana.com/docs/grafana-cloud/testing/synthetic-monitoring/) probe you can run alongside the app, so checks can target it on its private network (`frontend`, `backend:8000`, etc. — plain `localhost` or cluster-internal addresses aren't reachable by Grafana Cloud's public probes).
+
+1. Provision the probe against your Grafana Cloud stack and grab its token:
+   ```shell
+   gcx synthetic-monitoring probes create --name oktoberfest-probe --region <region>
+   ```
+2. Put the resulting `serverAddress` and token into:
+   - **Docker Compose**: `.env` (`SM_API_SERVER_ADDRESS`, `SM_AGENT_API_TOKEN`), then start it with `docker compose --profile monitoring up -d sm-probe` (it's excluded from a plain `docker compose up`).
+   - **Kubernetes**: `k8s/monitoring/secret.yaml`, then `kubectl apply -k k8s/monitoring/` (kept separate from `k8s/kustomization.yaml` — it isn't applied by the main `kubectl apply -k k8s/`).
+3. Once the probe shows up in `gcx synthetic-monitoring probes list`, create a check that targets it (e.g. `http://frontend/` from Compose, or the frontend Service's cluster address from Kubernetes) — see the `synth-manage-checks` gcx agent skill for the YAML format.
 
 ### Running backend tests
 
