@@ -88,6 +88,7 @@ Kept intentionally normalized and small so it's easy to extend (e.g. adding orde
 - **Extensibility**: clear separation of concerns (frontend/backend/DB) so new features (payments, registration, order history, inventory, admin tools) can be added without restructuring the tiers.
 - **Containerization**: each tier runs and can be rebuilt/redeployed independently via Docker; a single `docker-compose.yml` should bring up the full stack for local development.
 - **Kubernetes-deployable**: the application containers must also be deployable on Kubernetes (including a local minikube cluster) via standard manifests (Deployments, Services, ConfigMaps/Secrets, PVC for the database), without requiring Docker Compose.
+- **Resilient backend startup**: the backend must not crash if the database is not yet reachable when it starts (e.g. on first boot in Kubernetes, where there is no `depends_on`-style startup ordering). It should retry the database connection with backoff until it succeeds, rather than exiting and relying on the container runtime to restart it.
 - **Security basics**: hashed passwords, server-side session/authorization checks, no secrets committed to the repo (use environment variables / `.env` for DB credentials, session secret, etc.).
 
 ## 6. Explicit Non-Goals (v1)
