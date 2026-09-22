@@ -28,7 +28,6 @@ minikube image build -t oktoberfest-backend:latest ./backend
 minikube image build -t oktoberfest-frontend:latest ./frontend
 
 kubectl apply -k k8s/
-kubectl -n oktoberfest get pods    # wait for db/backend/frontend to be Running
 
 minikube service frontend -n oktoberfest   # opens the shop in your browser
 ```
