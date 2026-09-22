@@ -24,6 +24,8 @@ Guiding principle: **keep it simple**. Favor a small, well-understood feature se
 
 All three run as separate Docker containers (e.g. via `docker-compose`), each with its own image and independently restartable. Frontend and backend communicate over HTTP within the Docker network; only the frontend (and optionally the backend, for debugging) is exposed to the host.
 
+The same container images must also be deployable on Kubernetes, including a local minikube cluster — i.e. images/config should not rely on Docker Compose-specific behavior (bind mounts, `depends_on` health ordering, etc.) that wouldn't translate to Kubernetes resources (Deployments, Services, ConfigMaps/Secrets, PVCs).
+
 ### 2.3 Stack
 
 - Frontend: React or a lightweight server-rendered framework
@@ -85,6 +87,7 @@ Kept intentionally normalized and small so it's easy to extend (e.g. adding orde
 - **Simplicity**: minimal features, minimal dependencies, straightforward code — this is a foundation to build on, not a finished product.
 - **Extensibility**: clear separation of concerns (frontend/backend/DB) so new features (payments, registration, order history, inventory, admin tools) can be added without restructuring the tiers.
 - **Containerization**: each tier runs and can be rebuilt/redeployed independently via Docker; a single `docker-compose.yml` should bring up the full stack for local development.
+- **Kubernetes-deployable**: the application containers must also be deployable on Kubernetes (including a local minikube cluster) via standard manifests (Deployments, Services, ConfigMaps/Secrets, PVC for the database), without requiring Docker Compose.
 - **Security basics**: hashed passwords, server-side session/authorization checks, no secrets committed to the repo (use environment variables / `.env` for DB credentials, session secret, etc.).
 
 ## 6. Explicit Non-Goals (v1)
