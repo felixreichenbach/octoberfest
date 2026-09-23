@@ -61,7 +61,18 @@ There's an opt-in private [Grafana Synthetic Monitoring](https://grafana.com/doc
   k6 run -e BASE_URL=https://your-deployed-host k6/checkout-flow.js
   ```
   It exits non-zero on any failed check (enforced via a `checks` threshold), and true to the flow it tests, **every successful run places a real order**.
-- **The body of a Synthetic Monitoring "Scripted" check**, run periodically by a probe (e.g. the private one above) instead of by you. The exact `settings.scripted` YAML field gcx expects isn't nailed down here — the bundled `synth-manage-checks` skill notes that check type isn't fully documented and recommends pulling an existing Scripted check as a template (`gcx synthetic-monitoring checks get <ID> -o yaml`), and this stack doesn't have one yet. Easiest path: create the Scripted check once through the Grafana Cloud UI pointing at this script, then use gcx to pull and manage it as code from there.
+- **The body of a Synthetic Monitoring "Scripted" check**, run periodically by a probe (e.g. the private one above) instead of by you. `checkout-flow.js` stays the one source of truth for the test logic — `k6/generate-check.sh` derives the check YAML from it rather than a hand-maintained copy, since the API needs the script base64-encoded and pointed at a URL the probe (not you) can reach:
+  ```shell
+  PROBE_NAME=<your-probe-name> TARGET_URL=http://frontend/ k6/generate-check.sh > check.yaml
+  gcx synthetic-monitoring checks create -f check.yaml
+  gcx synthetic-monitoring checks status <ID>
+  ```
+  `PROBE_NAME` is required (see `gcx synthetic-monitoring probes list`); `TARGET_URL`, `JOB_NAME`, `FREQUENCY_MS`, `TIMEOUT_MS` all have defaults — run the script with no args set to see them, or read the comments at the top of `k6/generate-check.sh`. To update an existing check instead of creating a new one: `gcx synthetic-monitoring checks update <ID> -f check.yaml`.
+
+  A thing worth knowing:
+  - A private probe may come back from `gcx synthetic-monitoring probes create` with `disableScriptedChecks`/`disableBrowserChecks` set to `true` — no `gcx` command can toggle this (there's no `probes update`); it has to be enabled from the probe's edit page in the Grafana UI first.
+
+  This check runs every `FREQUENCY_MS` (default 60s) for as long as the app + probe stay up, and **each successful run adds a real order** — expect a steadily growing `orders` table.
 
 ### Running backend tests
 
