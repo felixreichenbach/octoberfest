@@ -51,6 +51,18 @@ There's an opt-in private [Grafana Synthetic Monitoring](https://grafana.com/doc
    - **Kubernetes**: `k8s/monitoring/secret.yaml`, then `kubectl apply -k k8s/monitoring/` (kept separate from `k8s/kustomization.yaml` — it isn't applied by the main `kubectl apply -k k8s/`).
 3. Once the probe shows up in `gcx synthetic-monitoring probes list`, create a check that targets it (e.g. `http://frontend/` from Compose, or the frontend Service's cluster address from Kubernetes) — see the `synth-manage-checks` gcx agent skill for the YAML format.
 
+#### k6 checkout-flow script
+
+`k6/checkout-flow.js` exercises the full shop flow end to end — login, list products, add to cart, submit purchase, fetch the confirmation, logout — asserting on each step. It's a plain k6 script, so it doubles as:
+
+- **A local/CI smoke test**, runnable directly:
+  ```shell
+  k6 run k6/checkout-flow.js                                  # against http://localhost:8080
+  k6 run -e BASE_URL=https://your-deployed-host k6/checkout-flow.js
+  ```
+  It exits non-zero on any failed check (enforced via a `checks` threshold), and true to the flow it tests, **every successful run places a real order**.
+- **The body of a Synthetic Monitoring "Scripted" check**, run periodically by a probe (e.g. the private one above) instead of by you. The exact `settings.scripted` YAML field gcx expects isn't nailed down here — the bundled `synth-manage-checks` skill notes that check type isn't fully documented and recommends pulling an existing Scripted check as a template (`gcx synthetic-monitoring checks get <ID> -o yaml`), and this stack doesn't have one yet. Easiest path: create the Scripted check once through the Grafana Cloud UI pointing at this script, then use gcx to pull and manage it as code from there.
+
 ### Running backend tests
 
 The backend has a pytest suite (`backend/tests/`) covering auth, products, cart, and orders against an in-memory database — no Docker or Postgres needed. Run it before deploying any backend change:
