@@ -18,6 +18,12 @@ spec:
           image: "grafana/synthetic-monitoring-agent:latest"
           args:
             - --api-server-address=$(API_SERVER_ADDRESS)
+            # Scripted/browser checks refuse targets in this CIDR by default (SSRF guard).
+            # minikube's service network is private (10.0.0.0/8 by default), so a check
+            # against an in-cluster Service would otherwise fail with "IP is in a
+            # blacklisted range" — clear the blocklist since this probe only ever
+            # targets its own cluster.
+            - --blocked-nets=
           env:
             - name: API_SERVER_ADDRESS
               valueFrom:
