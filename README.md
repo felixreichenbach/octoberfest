@@ -74,6 +74,14 @@ There's an opt-in private [Grafana Synthetic Monitoring](https://grafana.com/doc
 
   This check runs every `FREQUENCY_MS` (default 60s) for as long as the app + probe stay up, and **each successful run adds a real order** — expect a steadily growing `orders` table.
 
+  **Pointing the Compose probe at the minikube deployment instead:** `sm-probe` and the minikube-deployed app are on separate Docker networks, so `sm-probe` can't resolve minikube's Service names directly. It *can* reach anything port-forwarded onto the host, though, via `host.docker.internal` (verified: `docker compose exec sm-probe wget -qO- http://host.docker.internal:8090/api/health` worked while a port-forward was open):
+  ```shell
+  kubectl -n oktoberfest port-forward svc/frontend 8090:80 &
+  TARGET_URL=http://host.docker.internal:8090/ PROBE_NAME=oktoberfest-probe k6/generate-check.sh > check.yaml
+  gcx synthetic-monitoring checks create -f check.yaml
+  ```
+  Two caveats: `kubectl port-forward` isn't durable — it's a foreground process tied to your session, so this only lasts as long as that command keeps running; and `host.docker.internal` is a Docker Desktop (Mac/Windows) convenience that doesn't exist on native Linux Docker. For monitoring the minikube deployment on an ongoing basis, deploying a probe inside the cluster via `k8s/monitoring/` (with its own probe/token) is the more robust option.
+
 ### Running backend tests
 
 The backend has a pytest suite (`backend/tests/`) covering auth, products, cart, and orders against an in-memory database — no Docker or Postgres needed. Run it before deploying any backend change:
