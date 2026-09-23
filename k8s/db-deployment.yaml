@@ -13,6 +13,8 @@ spec:
     metadata:
       labels:
         app: db
+      annotations:
+        resource.opentelemetry.io/service.name: oktoberfest-database
     spec:
       containers:
         - name: db

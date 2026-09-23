@@ -67,10 +67,11 @@ There's an opt-in private [Grafana Synthetic Monitoring](https://grafana.com/doc
   gcx synthetic-monitoring checks create -f check.yaml
   gcx synthetic-monitoring checks status <ID>
   ```
-  `PROBE_NAME` is required (see `gcx synthetic-monitoring probes list`); `TARGET_URL`, `JOB_NAME`, `FREQUENCY_MS`, `TIMEOUT_MS` all have defaults — run the script with no args set to see them, or read the comments at the top of `k6/generate-check.sh`. To update an existing check instead of creating a new one: `gcx synthetic-monitoring checks update <ID> -f check.yaml`.
+  `PROBE_NAME` is required (see `gcx synthetic-monitoring probes list`); `TARGET_URL`, `JOB_NAME`, `FREQUENCY_MS`, `TIMEOUT_MS`, `SERVICE_NAME` all have defaults/are optional — run the script with no args set to see them, or read the comments at the top of `k6/generate-check.sh`. To update an existing check instead of creating a new one: `gcx synthetic-monitoring checks update <ID> -f check.yaml`.
 
-  A thing worth knowing:
+  Things worth knowing:
   - A private probe may come back from `gcx synthetic-monitoring probes create` with `disableScriptedChecks`/`disableBrowserChecks` set to `true` — no `gcx` command can toggle this (there's no `probes update`); it has to be enabled from the probe's edit page in the Grafana UI first.
+  - `SERVICE_NAME=<value>` adds a `service_name` label at check-creation time (e.g. for correlating the check with a service in Service Center), but verified in practice: it comes back on logs/metrics as `label_service_name`, not a literal `service_name` (that field is reserved — derived from the check's own job name). Confirm in the target UI whether the prefixed form actually satisfies its matching logic before relying on it.
 
   This check runs every `FREQUENCY_MS` (default 60s) for as long as the app + probe stay up, and **each successful run adds a real order** — expect a steadily growing `orders` table.
 
