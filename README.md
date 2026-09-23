@@ -104,6 +104,26 @@ gcx synthetic-monitoring checks create -f check.yaml
 ```
 Two caveats: `kubectl port-forward` isn't durable — it's a foreground process tied to your session, so this only lasts as long as that command keeps running; and `host.docker.internal` is a Docker Desktop (Mac/Windows) convenience that doesn't exist on native Linux Docker. For monitoring the minikube deployment on an ongoing basis, deploying a probe inside the cluster via `k8s/monitoring/` (with its own probe/token) is the more robust option.
 
+### Root-cause demo: broken order regression
+
+The `demo-broken-order-typo` branch carries an intentional one-line regression (`item.unit_price` → `item.unit_prices` in `backend/app/routers/orders.py`) that breaks order submission/lookup with an `AttributeError` — for demoing the Synthetic Monitoring check catching a real outage, root-caused via `gcx` logs/traces, then fixed by redeploying `main`. **Never merge that branch into `main`.**
+
+```shell
+git checkout demo-broken-order-typo
+minikube image build -t oktoberfest-backend:latest ./backend
+kubectl -n oktoberfest rollout restart deployment/backend
+kubectl -n oktoberfest rollout status deployment/backend
+```
+
+Watch the check (created in the Synthetic Monitoring section above) flip to `FAILING` within a minute or two — look up its ID by job name rather than hardcoding it, since it isn't stable across recreations:
+```shell
+CHECK_ID=$(gcx synthetic-monitoring checks list --job 'oktoberfest-checkout-flow' --jq '.[0].metadata.name' | tr -d '"' | grep -oE '[0-9]+$')
+gcx synthetic-monitoring checks status "$CHECK_ID"
+gcx synthetic-monitoring checks timeline "$CHECK_ID" --from now-10m --to now
+```
+
+To recover, switch back to `main` and repeat the same build/restart commands. Full walkthrough, including where to look for the root cause: [docs/demo-broken-order.md](docs/demo-broken-order.md).
+
 ### Running backend tests
 
 The backend has a pytest suite (`backend/tests/`) covering auth, products, cart, and orders against an in-memory database — no Docker or Postgres needed. Run it before deploying any backend change:
