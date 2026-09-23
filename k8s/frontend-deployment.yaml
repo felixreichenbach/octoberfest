@@ -11,6 +11,8 @@ spec:
     metadata:
       labels:
         app: frontend
+      annotations:
+        resource.opentelemetry.io/service.name: oktoberfest-frontend
     spec:
       containers:
         - name: frontend

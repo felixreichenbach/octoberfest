@@ -23,6 +23,13 @@
 #   JOB_NAME     (default: oktoberfest-checkout-flow)
 #   FREQUENCY_MS (default: 60000) How often the check runs, in milliseconds.
 #   TIMEOUT_MS   (default: 30000) Must be less than FREQUENCY_MS.
+#   SERVICE_NAME (optional) If set, adds a service_name label for correlating
+#                this check with a service elsewhere (e.g. Service Center).
+#                Note: the API exposes check-level custom labels prefixed —
+#                this shows up on logs/metrics as `label_service_name`, not a
+#                literal `service_name` (that field is reserved, derived from
+#                the check's own job name). Verify in the target UI whether
+#                that prefixed form actually satisfies its matching logic.
 
 set -euo pipefail
 
@@ -34,6 +41,7 @@ TARGET_URL="${TARGET_URL:-http://frontend/}"
 JOB_NAME="${JOB_NAME:-oktoberfest-checkout-flow}"
 FREQUENCY_MS="${FREQUENCY_MS:-60000}"
 TIMEOUT_MS="${TIMEOUT_MS:-30000}"
+SERVICE_NAME="${SERVICE_NAME:-}"
 
 if [ "$TIMEOUT_MS" -ge "$FREQUENCY_MS" ]; then
   echo "TIMEOUT_MS ($TIMEOUT_MS) must be less than FREQUENCY_MS ($FREQUENCY_MS)" >&2
@@ -44,6 +52,14 @@ fi
 BASE_URL="${TARGET_URL%/}"
 
 SCRIPT_B64=$(sed "s|^const BASE_URL = .*|const BASE_URL = '${BASE_URL}';|" "$SOURCE_SCRIPT" | base64 | tr -d '\n')
+
+LABELS_YAML="    - name: source
+      value: k6-generate-check"
+if [ -n "$SERVICE_NAME" ]; then
+  LABELS_YAML="${LABELS_YAML}
+    - name: service_name
+      value: ${SERVICE_NAME}"
+fi
 
 cat <<YAML
 apiVersion: syntheticmonitoring.ext.grafana.app/v1alpha1
@@ -57,8 +73,7 @@ spec:
   timeout: ${TIMEOUT_MS}
   enabled: true
   labels:
-    - name: source
-      value: k6-generate-check
+${LABELS_YAML}
   probes:
     - ${PROBE_NAME}
   alertSensitivity: none

@@ -11,6 +11,8 @@ spec:
     metadata:
       labels:
         app: backend
+      annotations:
+        resource.opentelemetry.io/service.name: oktoberfest-backend
     spec:
       containers:
         - name: backend
