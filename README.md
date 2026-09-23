@@ -34,9 +34,53 @@ minikube service frontend -n oktoberfest   # opens the shop in your browser
 
 Notes:
 
-- The `backend` pod will typically restart once or twice on first boot (`CrashLoopBackOff`) while `db` is still starting — there's no Compose-style `depends_on` in Kubernetes, so it relies on the normal restart backoff instead. It recovers on its own once Postgres is ready.
+- There's no Compose-style `depends_on` in Kubernetes, so the backend retries its database connection internally with backoff on startup instead of relying on restarts — it comes up clean even if `db` isn't ready yet.
 - `k8s/secret.yaml` ships the same demo credentials as `docker-compose.yml`, for the same reason — replace them before any real deployment.
 - To tear down: `kubectl delete -k k8s/` (and `minikube stop` if you're done with the cluster).
+
+### Synthetic Monitoring (optional, via `gcx`)
+
+There's an opt-in private [Grafana Synthetic Monitoring](https://grafana.com/docs/grafana-cloud/testing/synthetic-monitoring/) probe you can run alongside the app, so checks can target it on its private network (`frontend`, `backend:8000`, etc. — plain `localhost` or cluster-internal addresses aren't reachable by Grafana Cloud's public probes).
+
+1. Provision the probe against your Grafana Cloud stack and grab its token:
+   ```shell
+   gcx synthetic-monitoring probes create --name oktoberfest-probe --region <region>
+   ```
+2. Put the resulting `serverAddress` and token into:
+   - **Docker Compose**: `.env` (`SM_API_SERVER_ADDRESS`, `SM_AGENT_API_TOKEN`), then start it with `docker compose --profile monitoring up -d sm-probe` (it's excluded from a plain `docker compose up`).
+   - **Kubernetes**: `k8s/monitoring/secret.yaml`, then `kubectl apply -k k8s/monitoring/` (kept separate from `k8s/kustomization.yaml` — it isn't applied by the main `kubectl apply -k k8s/`).
+3. Once the probe shows up in `gcx synthetic-monitoring probes list`, create a check that targets it (e.g. `http://frontend/` from Compose, or the frontend Service's cluster address from Kubernetes) — see the `synth-manage-checks` gcx agent skill for the YAML format.
+
+#### k6 checkout-flow script
+
+`k6/checkout-flow.js` exercises the full shop flow end to end — login, list products, add to cart, submit purchase, fetch the confirmation, logout — asserting on each step. It's a plain k6 script, so it doubles as:
+
+- **A local/CI smoke test**, runnable directly:
+  ```shell
+  k6 run k6/checkout-flow.js                                  # against http://localhost:8080
+  k6 run -e BASE_URL=https://your-deployed-host k6/checkout-flow.js
+  ```
+  It exits non-zero on any failed check (enforced via a `checks` threshold), and true to the flow it tests, **every successful run places a real order**.
+- **The body of a Synthetic Monitoring "Scripted" check**, run periodically by a probe (e.g. the private one above) instead of by you. `checkout-flow.js` stays the one source of truth for the test logic — `k6/generate-check.sh` derives the check YAML from it rather than a hand-maintained copy, since the API needs the script base64-encoded and pointed at a URL the probe (not you) can reach:
+  ```shell
+  PROBE_NAME=<your-probe-name> TARGET_URL=http://frontend/ k6/generate-check.sh > check.yaml
+  gcx synthetic-monitoring checks create -f check.yaml
+  gcx synthetic-monitoring checks status <ID>
+  ```
+  `PROBE_NAME` is required (see `gcx synthetic-monitoring probes list`); `TARGET_URL`, `JOB_NAME`, `FREQUENCY_MS`, `TIMEOUT_MS` all have defaults — run the script with no args set to see them, or read the comments at the top of `k6/generate-check.sh`. To update an existing check instead of creating a new one: `gcx synthetic-monitoring checks update <ID> -f check.yaml`.
+
+  A thing worth knowing:
+  - A private probe may come back from `gcx synthetic-monitoring probes create` with `disableScriptedChecks`/`disableBrowserChecks` set to `true` — no `gcx` command can toggle this (there's no `probes update`); it has to be enabled from the probe's edit page in the Grafana UI first.
+
+  This check runs every `FREQUENCY_MS` (default 60s) for as long as the app + probe stay up, and **each successful run adds a real order** — expect a steadily growing `orders` table.
+
+  **Pointing the Compose probe at the minikube deployment instead:** `sm-probe` and the minikube-deployed app are on separate Docker networks, so `sm-probe` can't resolve minikube's Service names directly. It *can* reach anything port-forwarded onto the host, though, via `host.docker.internal` (verified: `docker compose exec sm-probe wget -qO- http://host.docker.internal:8090/api/health` worked while a port-forward was open):
+  ```shell
+  kubectl -n oktoberfest port-forward svc/frontend 8090:80 &
+  TARGET_URL=http://host.docker.internal:8090/ PROBE_NAME=oktoberfest-probe k6/generate-check.sh > check.yaml
+  gcx synthetic-monitoring checks create -f check.yaml
+  ```
+  Two caveats: `kubectl port-forward` isn't durable — it's a foreground process tied to your session, so this only lasts as long as that command keeps running; and `host.docker.internal` is a Docker Desktop (Mac/Windows) convenience that doesn't exist on native Linux Docker. For monitoring the minikube deployment on an ongoing basis, deploying a probe inside the cluster via `k8s/monitoring/` (with its own probe/token) is the more robust option.
 
 ### Running backend tests
 

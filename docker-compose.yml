@@ -7,6 +7,8 @@ services:
       POSTGRES_DB: oktoberfest
     volumes:
       - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U oktoberfest"]
       interval: 5s
@@ -30,6 +32,18 @@ services:
       - backend
     ports:
       - "8080:80"
+
+  # Private Grafana Synthetic Monitoring probe. Opt-in only (see README) — needs
+  # a real probe token from `gcx synthetic-monitoring probes create` to do anything.
+  sm-probe:
+    image: grafana/synthetic-monitoring-agent:latest
+    profiles:
+      - monitoring
+    command:
+      - --api-server-address=${SM_API_SERVER_ADDRESS}
+    environment:
+      SM_AGENT_API_TOKEN: ${SM_AGENT_API_TOKEN}
+    restart: unless-stopped
 
 volumes:
   db_data:
