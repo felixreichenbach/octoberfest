@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api.js'
 import { useAuth } from '../AuthContext.jsx'
+import LogoutButton from '../LogoutButton.jsx'
 
 export default function Confirmation() {
   const { orderId } = useParams()
@@ -22,6 +23,10 @@ export default function Confirmation() {
   if (error) {
     return (
       <div className="page page-narrow">
+        <header className="page-header">
+          <h1>Order</h1>
+          <LogoutButton />
+        </header>
         <p className="error">{error}</p>
         <button className="primary" onClick={handleContinue}>
           Continue
@@ -34,7 +39,10 @@ export default function Confirmation() {
 
   return (
     <div className="page page-narrow">
-      <h1>Order confirmed</h1>
+      <header className="page-header">
+        <h1>Order confirmed</h1>
+        <LogoutButton />
+      </header>
       <div className="card">
         <p>Order #{order.id}</p>
         <ul>

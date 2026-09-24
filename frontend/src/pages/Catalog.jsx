@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api.js'
+import LogoutButton from '../LogoutButton.jsx'
 
 export default function Catalog() {
   const [products, setProducts] = useState([])
@@ -25,9 +26,12 @@ export default function Catalog() {
     <div className="page">
       <header className="page-header">
         <h1>Products</h1>
-        <Link to="/cart" className="button-link">
-          View cart
-        </Link>
+        <div className="header-actions">
+          <Link to="/cart" className="button-link">
+            View cart
+          </Link>
+          <LogoutButton />
+        </div>
       </header>
       {error && <p className="error">{error}</p>}
       <div className="grid">

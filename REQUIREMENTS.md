@@ -42,6 +42,7 @@ The same container images must also be deployable on Kubernetes, including a loc
 - On success, a session is established (e.g. session cookie or JWT) so the backend can identify the logged-in user on subsequent requests.
 - No self-service registration is required for v1 — users can be seeded directly in the database. (Explicit non-goal, revisit later if needed.)
 - Sessions expire after a period of inactivity; an expired session is treated the same as "not logged in" (see 3.5).
+- A **"Logout" button**, visible on every page while logged in (Catalog, Cart, Order Confirmation), ends the session server-side and returns the user to the Login page.
 
 ### 3.2 Product Catalog Page
 
