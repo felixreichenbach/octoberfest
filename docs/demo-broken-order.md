@@ -5,10 +5,12 @@ existing Synthetic Monitoring check (job `oktoberfest-checkout-flow`) go red,
 root-cause it via `gcx` (logs/traces) with Claude Code, fix it, and redeploy
 straight to minikube.
 
-The bug lives on the `demo-broken-order-typo` branch — a one-line typo in
-`backend/app/routers/orders.py`'s `_serialize()` helper (`item.unit_price` →
-`item.unit_prices`), which breaks both order submission and order lookup
-with an `AttributeError` → 500. `main` is always the known-good state.
+The bug is a one-line typo in `backend/app/routers/orders.py`'s
+`_serialize()` helper (`item.unit_price` → `item.unit_prices`), which breaks
+both order submission and order lookup with an `AttributeError` → 500.
+`scripts/deploy-broken-order.sh` patches this into the file directly and
+redeploys; `main` is always the known-good state, restored with a plain
+`git checkout --`.
 
 ## Prerequisites
 
@@ -34,10 +36,7 @@ rest of this walkthrough.
 ## 2. Ship the regression
 
 ```shell
-git checkout demo-broken-order-typo
-minikube image build -t oktoberfest-backend:latest ./backend
-kubectl -n oktoberfest rollout restart deployment/backend
-kubectl -n oktoberfest rollout status deployment/backend
+scripts/deploy-broken-order.sh
 ```
 
 ## 3. Watch the check catch it
@@ -70,7 +69,7 @@ investigation live in Claude Code with `gcx`. Useful starting points:
 ## 5. Fix it and redeploy
 
 ```shell
-git checkout main
+git checkout -- backend/app/routers/orders.py
 minikube image build -t oktoberfest-backend:latest ./backend
 kubectl -n oktoberfest rollout restart deployment/backend
 kubectl -n oktoberfest rollout status deployment/backend
