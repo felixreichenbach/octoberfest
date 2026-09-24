@@ -106,13 +106,10 @@ Two caveats: `kubectl port-forward` isn't durable — it's a foreground process 
 
 ### Root-cause demo: broken order regression
 
-The `demo-broken-order-typo` branch carries an intentional one-line regression (`item.unit_price` → `item.unit_prices` in `backend/app/routers/orders.py`) that breaks order submission/lookup with an `AttributeError` — for demoing the Synthetic Monitoring check catching a real outage, root-caused via `gcx` logs/traces, then fixed by redeploying `main`. **Never merge that branch into `main`.**
+`scripts/deploy-broken-order.sh` ships an intentional one-line regression (`item.unit_price` → `item.unit_prices` in `backend/app/routers/orders.py`) that breaks order submission/lookup with an `AttributeError` — for demoing the Synthetic Monitoring check catching a real outage, root-caused via `gcx` logs/traces, then fixed by reverting the file and redeploying. **Never commit the patched file.**
 
 ```shell
-git checkout demo-broken-order-typo
-minikube image build -t oktoberfest-backend:latest ./backend
-kubectl -n oktoberfest rollout restart deployment/backend
-kubectl -n oktoberfest rollout status deployment/backend
+scripts/deploy-broken-order.sh
 ```
 
 Watch the check (created in the Synthetic Monitoring section above) flip to `FAILING` within a minute or two — look up its ID by job name rather than hardcoding it, since it isn't stable across recreations:
@@ -122,7 +119,7 @@ gcx synthetic-monitoring checks status "$CHECK_ID"
 gcx synthetic-monitoring checks timeline "$CHECK_ID" --from now-10m --to now
 ```
 
-To recover, switch back to `main` and repeat the same build/restart commands. Full walkthrough, including where to look for the root cause: [docs/demo-broken-order.md](docs/demo-broken-order.md).
+To recover: `git checkout -- backend/app/routers/orders.py`, then rebuild and restart the backend the same way. Full walkthrough, including where to look for the root cause: [docs/demo-broken-order.md](docs/demo-broken-order.md).
 
 ### Running backend tests
 
