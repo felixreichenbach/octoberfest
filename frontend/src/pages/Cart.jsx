@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api.js'
+import LogoutButton from '../LogoutButton.jsx'
 
 export default function Cart() {
   const [cart, setCart] = useState({ items: [], total: 0 })
@@ -35,9 +36,12 @@ export default function Cart() {
     <div className="page">
       <header className="page-header">
         <h1>Your cart</h1>
-        <Link to="/catalog" className="button-link">
-          ← Back to products
-        </Link>
+        <div className="header-actions">
+          <Link to="/catalog" className="button-link">
+            ← Back to products
+          </Link>
+          <LogoutButton />
+        </div>
       </header>
       {error && <p className="error">{error}</p>}
       {cart.items.length === 0 ? (
