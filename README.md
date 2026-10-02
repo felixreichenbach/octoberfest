@@ -131,6 +131,26 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest -v
 ```
 
+### Cleanup
+
+Tear down the alerting resources created for the demos above (notification policies, alert rules, contact points, folder). Run in order — some commands depend on resources created by earlier ones still existing (e.g. the folder delete expects the alert rules inside it to be gone first):
+
+```shell
+# Resets the whole notification-policy tree to Grafana's default (root receiver becomes `empty`, breaking alerting stack-wide until a real receiver is set again)
+gcx alert notification-policies reset --force -o yaml
+
+gcx resources delete alertrules/oktoberfest-checkout-failing --yes 2>&1
+
+gcx resources delete alertrules/<- Get the ID from UI ->
+
+gcx alert contact-points list   # find <contact-point-uid>
+gcx alert contact-points delete <contact-point-uid>
+
+gcx resources delete folders/oktoberfest
+```
+
+> **Warning:** the notification-policy reset is stack-wide — it affects every alert, not just this demo's. Only run it if you're sure no other alerting depends on the current policy tree.
+
 ## Grafana `agento11y` Installation
 
 Install packages:
