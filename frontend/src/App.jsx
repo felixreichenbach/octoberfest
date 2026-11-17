@@ -1,4 +1,6 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { faro } from './faro.js'
 import { AuthProvider, useAuth } from './AuthContext.jsx'
 import Login from './pages/Login.jsx'
 import Catalog from './pages/Catalog.jsx'
@@ -13,7 +15,19 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+// Report each client-side navigation to Faro as a view, using the route pattern
+// (e.g. /confirmation/:orderId) so order IDs don't fragment the page list.
+function usePageViews() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    if (!faro) return
+    const name = pathname.replace(/^\/confirmation\/[^/]+/, '/confirmation/:orderId')
+    faro.api.setView({ name })
+  }, [pathname])
+}
+
 function AppRoutes() {
+  usePageViews()
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
